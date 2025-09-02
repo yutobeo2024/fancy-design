@@ -217,3 +217,116 @@ export const generatePromptFromImage = async (
         throw new Error(error instanceof Error ? error.message : 'An unknown error occurred while analyzing the image.');
     }
 };
+
+// API base URL
+const API_BASE_URL = process.env.NODE_ENV === 'production' 
+? '/api'  // Vercel functions
+: 'http://localhost:3000/api';
+
+// Helper function để gọi API
+const callAPI = async (endpoint: string, data: any) => {
+const response = await fetch(`${API_BASE_URL}${endpoint}`, {
+method: 'POST',
+headers: {
+'Content-Type': 'application/json',
+},
+body: JSON.stringify(data)
+});
+
+if (!response.ok) {
+const errorData = await response.json();
+throw new Error(errorData.message || errorData.error || 'API call failed');
+}
+
+return response.json();
+};
+
+// Cập nhật function generateTshirtArtwork
+export const generateTshirtArtwork = async (prompt: string): Promise<string> => {
+try {
+const result = await callAPI('/generate-image', { prompt });
+
+if (result.success) {
+return result.imageDescription;
+} else {
+throw new Error('Failed to generate artwork');
+}
+} catch (error: any) {
+console.error('Error generating T-shirt artwork:', error);
+
+// Xử lý các loại lỗi từ backend
+if (error.message.includes('BILLING_REQUIRED')) {
+throw new Error('⚠️ Imagen API chỉ dành cho người dùng đã kích hoạt billing.\n\n' +
+'📋 Để sử dụng tính năng này:\n' +
+'1. Truy cập Google Cloud Console\n' +
+'2. Kích hoạt billing cho project\n' +
+'3. Enable Vertex AI API\n' +
+'4. Tạo API key mới từ Google Cloud Console\n\n' +
+'💡 Hoặc sử dụng Google AI Studio (miễn phí) với model text-only.');
+}
+
+if (error.message.includes('PERMISSION_DENIED')) {
+throw new Error('❌ Không có quyền truy cập API.\n\n' +
+'Vui lòng kiểm tra:\n' +
+'• API key có đúng không\n' +
+'• API key có quyền truy cập Gemini API\n' +
+'• Project có enable các API cần thiết');
+}
+
+throw new Error(`Lỗi tạo thiết kế T-shirt: ${error.message}`);
+}
+};
+
+// Cập nhật function generatePromptFromImage
+export const generatePromptFromImage = async (file: File): Promise<string> => {
+try {
+// Convert file to base64
+const base64Data = await new Promise<string>((resolve, reject) => {
+const reader = new FileReader();
+reader.onload = () => {
+const result = reader.result as string;
+const base64 = result.split(',')[1]; // Remove data:image/...;base64, prefix
+resolve(base64);
+};
+reader.onerror = reject;
+reader.readAsDataURL(file);
+});
+
+const result = await callAPI('/analyze-image', {
+imageData: base64Data,
+mimeType: file.type
+});
+
+if (result.success) {
+return result.generatedPrompt;
+} else {
+throw new Error('Failed to analyze image');
+}
+} catch (error: any) {
+console.error('Error analyzing image:', error);
+
+if (error.message.includes('BILLING_REQUIRED')) {
+throw new Error('⚠️ Vision API chỉ dành cho người dùng đã kích hoạt billing.\n\n' +
+'Vui lòng kích hoạt billing trên Google Cloud Console.');
+}
+
+throw new Error(`Lỗi phân tích hình ảnh: ${error.message}`);
+}
+};
+
+// Remove background function (giữ nguyên client-side)
+export const removeGreenScreenClientSide = async (file: File): Promise<string> => {
+// ... existing implementation
+}
+
+// Helper function (giữ nguyên)
+function fileToGenerativePart(file: File): Promise<any> {
+const base64EncodedDataPromise = new Promise<string>((resolve) => {
+const reader = new FileReader();
+reader.onloadend = () => resolve((reader.result as string).split(',')[1]);
+reader.readAsDataURL(file);
+});
+return {
+inlineData: { data: await base64EncodedDataPromise, mimeType: file.type }
+};
+};

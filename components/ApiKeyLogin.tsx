@@ -39,6 +39,37 @@ const ApiKeyLogin: React.FC<ApiKeyLoginProps> = ({ onApiKeySubmit, isLoading = f
     onApiKeySubmit(apiKey.trim());
   };
 
+  // Loại bỏ phần nhập API key vì giờ sử dụng backend
+  // Hoặc giữ lại để test local development
+  
+  const ApiKeyLogin = () => {
+    return (
+      <div className="min-h-screen bg-gradient-to-br from-purple-900 via-blue-900 to-indigo-900 flex items-center justify-center p-4">
+        <div className="bg-white/10 backdrop-blur-md rounded-2xl p-8 max-w-md w-full border border-white/20">
+          <h1 className="text-3xl font-bold text-white mb-6 text-center">
+            AI T-shirt Designer
+          </h1>
+          
+          <div className="text-white/80 mb-6">
+            <p className="mb-4">
+              🎨 Ứng dụng đã được cấu hình với backend API bảo mật.
+            </p>
+            <p className="mb-4">
+              ✨ Bạn có thể bắt đầu thiết kế T-shirt ngay lập tức!
+            </p>
+          </div>
+          
+          <button
+            onClick={() => onApiKeySubmit('backend-configured')}
+            className="w-full bg-gradient-to-r from-purple-600 to-blue-600 text-white py-3 px-6 rounded-lg font-semibold hover:from-purple-700 hover:to-blue-700 transition-all duration-200"
+          >
+            Bắt đầu thiết kế
+          </button>
+        </div>
+      </div>
+    );
+  };
+  
   return (
     <div className="min-h-screen flex items-center justify-center bg-gray-900 p-4">
       <div className="w-full max-w-md bg-gray-800 rounded-lg shadow-xl p-8 border border-gray-700">
