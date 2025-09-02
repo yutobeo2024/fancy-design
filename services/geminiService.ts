@@ -36,7 +36,8 @@ export const generateTshirtArtwork = async (prompt: string): Promise<string> => 
     const result = await callAPI('/generate-image', { prompt });
 
     if (result.success) {
-      return result.text;
+      // FIX: Sử dụng đúng field từ API response
+      return result.imageDescription; // Thay vì result.text
     } else {
       throw new Error('Failed to generate artwork');
     }
@@ -85,7 +86,8 @@ export const generatePromptFromImage = async (file: File): Promise<string> => {
     });
 
     if (result.success) {
-      return result.analysis;
+      // FIX: Kiểm tra field đúng từ API response
+      return result.analysis || result.imageDescription || result.content;
     } else {
       throw new Error('Failed to analyze image');
     }
@@ -130,33 +132,26 @@ export const removeGreenScreenClientSide = async (imageBase64: string): Promise<
       const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
       const data = imageData.data;
 
-      // A threshold for color distance. A higher value is more tolerant to variations.
-      const colorDistanceThreshold = 100;
+      // Set tolerance for color matching
+      const tolerance = 30;
 
       for (let i = 0; i < data.length; i += 4) {
         const r = data[i];
         const g = data[i + 1];
         const b = data[i + 2];
-        
-        // Calculate the Euclidean distance between the current pixel color and the key color.
-        const distance = Math.sqrt(
-          Math.pow(r - keyR, 2) +
-          Math.pow(g - keyG, 2) +
-          Math.pow(b - keyB, 2)
-        );
 
-        // If the color is close to our key color, make it transparent.
-        if (distance < colorDistanceThreshold) {
-          data[i + 3] = 0; // Set alpha to 0
+        // Check if the pixel color is close to the key color
+        if (Math.abs(r - keyR) < tolerance && 
+            Math.abs(g - keyG) < tolerance && 
+            Math.abs(b - keyB) < tolerance) {
+          data[i + 3] = 0; // Set alpha to 0 (transparent)
         }
       }
 
       ctx.putImageData(imageData, 0, 0);
       resolve(canvas.toDataURL('image/png'));
     };
-    img.onerror = () => {
-      reject(new Error('Failed to load image for client-side background removal.'));
-    };
+    img.onerror = () => reject(new Error('Failed to load image'));
     img.src = imageBase64;
   });
 };
