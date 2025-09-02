@@ -218,6 +218,11 @@ export const generatePromptFromImage = async (
     }
 };
 
+/**
+ * @license
+ * SPDX-License-Identifier: Apache-2.0
+*/
+
 // API base URL
 const API_BASE_URL = process.env.NODE_ENV === 'production' 
 ? '/api'  // Vercel functions
@@ -241,13 +246,17 @@ throw new Error(errorData.message || errorData.error || 'API call failed');
 return response.json();
 };
 
-// Cập nhật function generateTshirtArtwork
+/**
+ * Generates T-shirt artwork using OpenRouter API with nano banana model
+ * @param prompt The user's description of the design.
+ * @returns A promise that resolves to the generated image description.
+ */
 export const generateTshirtArtwork = async (prompt: string): Promise<string> => {
 try {
 const result = await callAPI('/generate-image', { prompt });
 
 if (result.success) {
-return result.imageDescription;
+return result.text;
 } else {
 throw new Error('Failed to generate artwork');
 }
@@ -255,29 +264,27 @@ throw new Error('Failed to generate artwork');
 console.error('Error generating T-shirt artwork:', error);
 
 // Xử lý các loại lỗi từ backend
-if (error.message.includes('BILLING_REQUIRED')) {
-throw new Error('⚠️ Imagen API chỉ dành cho người dùng đã kích hoạt billing.\n\n' +
-'📋 Để sử dụng tính năng này:\n' +
-'1. Truy cập Google Cloud Console\n' +
-'2. Kích hoạt billing cho project\n' +
-'3. Enable Vertex AI API\n' +
-'4. Tạo API key mới từ Google Cloud Console\n\n' +
-'💡 Hoặc sử dụng Google AI Studio (miễn phí) với model text-only.');
+if (error.message.includes('quota') || error.message.includes('limit')) {
+throw new Error('⚠️ API quota đã hết.\n\n' +
+'Vui lòng thử lại sau hoặc kiểm tra OpenRouter credits.');
 }
 
-if (error.message.includes('PERMISSION_DENIED')) {
-throw new Error('❌ Không có quyền truy cập API.\n\n' +
+if (error.message.includes('unauthorized') || error.message.includes('invalid')) {
+throw new Error('❌ Lỗi xác thực API.\n\n' +
 'Vui lòng kiểm tra:\n' +
-'• API key có đúng không\n' +
-'• API key có quyền truy cập Gemini API\n' +
-'• Project có enable các API cần thiết');
+'• OpenRouter API key có đúng không\n' +
+'• API key có đủ credits không');
 }
 
 throw new Error(`Lỗi tạo thiết kế T-shirt: ${error.message}`);
 }
 };
 
-// Cập nhật function generatePromptFromImage
+/**
+ * Generates a descriptive prompt from an image file using OpenRouter API
+ * @param file The image file uploaded by the user.
+ * @returns A promise that resolves to the generated text prompt.
+ */
 export const generatePromptFromImage = async (file: File): Promise<string> => {
 try {
 // Convert file to base64
@@ -298,35 +305,78 @@ mimeType: file.type
 });
 
 if (result.success) {
-return result.generatedPrompt;
+return result.analysis;
 } else {
 throw new Error('Failed to analyze image');
 }
 } catch (error: any) {
 console.error('Error analyzing image:', error);
 
-if (error.message.includes('BILLING_REQUIRED')) {
-throw new Error('⚠️ Vision API chỉ dành cho người dùng đã kích hoạt billing.\n\n' +
-'Vui lòng kích hoạt billing trên Google Cloud Console.');
+if (error.message.includes('quota') || error.message.includes('limit')) {
+throw new Error('⚠️ API quota đã hết.\n\n' +
+'Vui lòng thử lại sau hoặc kiểm tra OpenRouter credits.');
 }
 
 throw new Error(`Lỗi phân tích hình ảnh: ${error.message}`);
 }
 };
 
-// Remove background function (giữ nguyên client-side)
-export const removeGreenScreenClientSide = async (file: File): Promise<string> => {
-// ... existing implementation
+/**
+ * Removes a solid color background from an image using a canvas by sampling a corner pixel.
+ * This client-side "chroma key" operation is highly reliable.
+ * @param imageBase64 The base64 data URL of the image with a solid background.
+ * @returns A promise that resolves to the base64 data URL of the image with a transparent background.
+ */
+export const removeGreenScreenClientSide = async (imageBase64: string): Promise<string> => {
+return new Promise((resolve, reject) => {
+const img = new Image();
+img.onload = () => {
+const canvas = document.createElement('canvas');
+canvas.width = img.width;
+canvas.height = img.height;
+const ctx = canvas.getContext('2d', { willReadFrequently: true });
+if (!ctx) {
+return reject(new Error('Could not get 2D canvas context'));
 }
 
-// Helper function (giữ nguyên)
-function fileToGenerativePart(file: File): Promise<any> {
-const base64EncodedDataPromise = new Promise<string>((resolve) => {
-const reader = new FileReader();
-reader.onloadend = () => resolve((reader.result as string).split(',')[1]);
-reader.readAsDataURL(file);
-});
-return {
-inlineData: { data: await base64EncodedDataPromise, mimeType: file.type }
+ctx.drawImage(img, 0, 0);
+
+// Get the color of the top-left pixel [1,1] to use as the key color.
+const keyPixelData = ctx.getImageData(1, 1, 1, 1).data;
+const keyR = keyPixelData[0];
+const keyG = keyPixelData[1];
+const keyB = keyPixelData[2];
+
+const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
+const data = imageData.data;
+
+// A threshold for color distance. A higher value is more tolerant to variations.
+const colorDistanceThreshold = 100;
+
+for (let i = 0; i < data.length; i += 4) {
+const r = data[i];
+const g = data[i + 1];
+const b = data[i + 2];
+
+// Calculate the Euclidean distance between the current pixel color and the key color.
+const distance = Math.sqrt(
+Math.pow(r - keyR, 2) +
+Math.pow(g - keyG, 2) +
+Math.pow(b - keyB, 2)
+);
+
+// If the color is close to our key color, make it transparent.
+if (distance < colorDistanceThreshold) {
+data[i + 3] = 0; // Set alpha to 0
+}
+}
+
+ctx.putImageData(imageData, 0, 0);
+resolve(canvas.toDataURL('image/png'));
 };
+img.onerror = () => {
+reject(new Error('Failed to load image for client-side background removal.'));
+};
+img.src = imageBase64;
+});
 };
