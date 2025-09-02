@@ -36,27 +36,13 @@ export const generateTshirtArtwork = async (prompt: string): Promise<string> => 
     const result = await callAPI('/generate-image', { prompt });
 
     if (result.success) {
-      // FIX: Sử dụng đúng field từ API response
-      return result.imageDescription; // Thay vì result.text
+      // Trả về URL hình ảnh thực tế
+      return result.imageUrl;
     } else {
       throw new Error('Failed to generate artwork');
     }
   } catch (error: any) {
     console.error('Error generating T-shirt artwork:', error);
-
-    // Xử lý các loại lỗi từ backend
-    if (error.message.includes('quota') || error.message.includes('limit')) {
-      throw new Error('⚠️ API quota đã hết.\n\n' +
-        'Vui lòng thử lại sau hoặc kiểm tra OpenRouter credits.');
-    }
-
-    if (error.message.includes('unauthorized') || error.message.includes('invalid')) {
-      throw new Error('❌ Lỗi xác thực API.\n\n' +
-        'Vui lòng kiểm tra:\n' +
-        '• OpenRouter API key có đúng không\n' +
-        '• API key có đủ credits không');
-    }
-
     throw new Error(`Lỗi tạo thiết kế T-shirt: ${error.message}`);
   }
 };
