@@ -1,4 +1,5 @@
-const { GoogleGenerativeAI } = require('@google/generative-ai');
+// Xóa dòng import GoogleGenerativeAI
+// const { GoogleGenerativeAI } = require('@google/generative-ai'); // ← XÓA DÒNG NÀY
 
 // Chuyển từ Google AI Studio sang OpenRouter với nano banana
 const OPENROUTER_API_KEY = process.env.OPENROUTER_API_KEY;
